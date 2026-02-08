@@ -5,8 +5,8 @@ import time
 import os
 from collections import namedtuple
 from pyglet.graphics import Batch
-from .beautiful_button import BeautifulButton
-from .constants import (
+from data.beautiful_button import BeautifulButton
+from data.constants import (
     SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT,
     BUTTON_SPACING, BACKGROUND_COLOR, SQUARE_COLOR,
     PAUSE_OVERLAY_COLOR
@@ -19,6 +19,18 @@ Rect = namedtuple('Rect', ['x', 'y', 'width', 'height'])
 class GameView(arcade.View):
     def __init__(self):
         super().__init__()
+        self.particles = []
+        self.particle_colors = [
+            (255, 50, 50),  # красный
+            (255, 100, 100),  # светло-красный
+            (255, 150, 150),  # розовый
+        ]
+        self.shoot_sound = None
+        self.hit_sound = None
+        self.win_sound = None
+        self.lose_sound = None
+        self.background_music = None
+        self.sound_enabled = True
         self.game_active = True
         self.game_time = 30.0  # 30 секунд игры
         self.start_time = None
@@ -43,9 +55,15 @@ class GameView(arcade.View):
         # Позиция сердца (игрока) - загружаем текстуру
         self.heart_x = SCREEN_WIDTH // 2
         self.heart_y = SCREEN_HEIGHT // 2
-        self.heart_size = 15  # УМЕНЬШИЛИ размер сердца (было 30)
-        self.heart_speed = 200  # Скорость движения (меньше)
-        self.heart_texture = None
+        self.heart_size = 25  # Размер хитбокса
+        self.heart_speed = 200  # Скорость движения
+        self.heart_texture = None  # Будет загружена в setup()
+
+        # Анимация сердца (менее заметная пульсация)
+        self.heart_pulse = 0.0
+        self.heart_pulse_speed = 2.5
+        self.heart_pulse_min = 0.92  # Минимальный масштаб (было 0.9)
+        self.heart_pulse_max = 1.08  # Максимальный масштаб (было 1.1)
 
         # Система пуль
         self.bullets = []
@@ -54,6 +72,18 @@ class GameView(arcade.View):
         self.bullets_dodged = 0
         self.total_bullets = 0
         self.bullet_radius = 35  # УВЕЛИЧИЛИ размер пуль (было 25)
+
+        # Спрайты для улучшенной коллизии
+        self.heart_sprite = None
+        self.bullet_sprites = arcade.SpriteList()
+
+        # Декоративный элемент (звезда в углу) - БЕЗ СПРАЙТА, рисуем вручную
+        self.decor_exists = True
+        self.decor_x = 50
+        self.decor_y = SCREEN_HEIGHT - 50
+        self.decor_radius = 15
+        self.decor_color = arcade.color.GOLD
+        self.decor_angle = 0
 
         # Управление
         self.keys_pressed = set()
@@ -92,6 +122,37 @@ class GameView(arcade.View):
         except Exception as e:
             print(f"Ошибка при загрузке текстуры: {e}")
             self.heart_texture = None
+
+        # Загрузка звуков
+        try:
+            self.shoot_sound = arcade.load_sound("sounds/shoot.wav")
+            self.hit_sound = arcade.load_sound("sounds/hit.wav")
+            self.win_sound = arcade.load_sound("sounds/win.wav")
+            self.lose_sound = arcade.load_sound("sounds/lose.wav")
+            self.background_music = arcade.load_sound("sounds/music.wav")
+        except Exception as e:
+            print(f"Ошибка при загрузке звуков: {e}")
+            print("Звуки не найдены. Создайте папку sounds/ с файлами:")
+            print("- shoot.wav (звук выстрела)")
+            print("- hit.wav (звук попадания)")
+            print("- win.wav (победа)")
+            print("- lose.wav (поражение)")
+            print("- music.wav (фоновая музыка)")
+            self.sound_enabled = False
+
+        # Создание спрайта сердца для улучшенной коллизии (если текстура загружена)
+        if self.heart_texture:
+            try:
+                self.heart_sprite = arcade.Sprite()
+                self.heart_sprite.texture = self.heart_texture
+                self.heart_sprite.width = self.heart_size * 2
+                self.heart_sprite.height = self.heart_size * 2
+                self.heart_sprite.center_x = self.heart_x
+                self.heart_sprite.center_y = self.heart_y
+                print("Спрайт сердца создан успешно")
+            except Exception as e:
+                print(f"Не удалось создать спрайт сердца: {e}")
+                self.heart_sprite = None
 
         self.batch = Batch()
 
@@ -184,6 +245,7 @@ class GameView(arcade.View):
         self.heart_x = SCREEN_WIDTH // 2
         self.heart_y = SCREEN_HEIGHT // 2
         self.bullets = []
+        self.bullet_sprites.clear()
         self.bullet_timer = 0
         self.bullets_dodged = 0
         self.total_bullets = 0
@@ -193,6 +255,13 @@ class GameView(arcade.View):
         self.game_active = True
         self.victory = False
         self.keys_pressed.clear()
+        self.heart_pulse = 0.0
+        self.decor_angle = 0
+
+        if self.heart_sprite:
+            self.heart_sprite.center_x = self.heart_x
+            self.heart_sprite.center_y = self.heart_y
+
         self.timer_text.text = f"Время: 30.0 сек"
         self.stats_text.text = f"Уклонений: 0"
         self.hp_text.text = f"HP: {self.player_hp}/{self.max_hp}"
@@ -202,6 +271,28 @@ class GameView(arcade.View):
 
         # Фон
         arcade.draw_lrbt_rectangle_filled(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, BACKGROUND_COLOR)
+
+        # Декоративный элемент (звезда в углу) - рисуем вручную
+        if self.decor_exists:
+            # Рисуем вращающуюся звезду
+            for i in range(5):
+                angle = self.decor_angle + i * 72  # 72 градуса между лучами (5 лучей)
+                dx = math.cos(math.radians(angle)) * self.decor_radius * 1.5
+                dy = math.sin(math.radians(angle)) * self.decor_radius * 1.5
+
+                # Луч звезды
+                arcade.draw_line(
+                    self.decor_x, self.decor_y,
+                    self.decor_x + dx, self.decor_y + dy,
+                    self.decor_color, 3
+                )
+
+            # Центр звезды
+            arcade.draw_circle_filled(
+                self.decor_x, self.decor_y,
+                self.decor_radius,
+                self.decor_color
+            )
 
         # Арена (прямоугольник)
         arcade.draw_lrbt_rectangle_outline(
@@ -215,20 +306,19 @@ class GameView(arcade.View):
             arcade.draw_circle_filled(bullet["x"], bullet["y"], self.bullet_radius, arcade.color.YELLOW)
             arcade.draw_circle_outline(bullet["x"], bullet["y"], self.bullet_radius, arcade.color.ORANGE, 3)
 
-        # Сердце (игрок) - ПРАВИЛЬНОЕ использование draw_texture_rect
-        # ИСПРАВЛЕНО: текстура съезжала вниз и влево
+        # Сердце (игрок) с пульсацией ОТНОСИТЕЛЬНО ЦЕНТРА и менее заметной
         if self.heart_texture:
-            # Визуальный размер сердца (может отличаться от hitbox)
-            # Увеличиваем визуальный размер для лучшего отображения
-            visual_width = self.heart_size * 1.8 # Больше hitbox для визуала
-            visual_height = self.heart_size * 1.8
+            # Менее заметная пульсация
+            pulse_progress = (math.sin(self.heart_pulse) + 1) / 2  # от 0 до 1
+            pulse_scale = self.heart_pulse_min + (self.heart_pulse_max - self.heart_pulse_min) * pulse_progress
 
-            # ИСПРАВЛЕНИЕ: текстура съезжала вниз и влево
-            # Центрируем текстуру относительно hitbox
-            # Если текстура съезжает вниз, нужно поднять Y
-            # Если текстура съезжает влево, нужно сдвинуть X вправо
-            x = self.heart_x - visual_width / 2 + self.heart_size * 0.3  # Сдвиг вправо
-            y = self.heart_y - visual_height / 2 + self.heart_size * 0.5  # Сдвиг вверх
+            # Визуальный размер сердца (центрируется относительно heart_x, heart_y)
+            visual_width = self.heart_size * 1.8 * pulse_scale
+            visual_height = self.heart_size * 1.8 * pulse_scale
+
+            # Центрирование относительно координат сердца
+            x = self.heart_x - visual_width / 2
+            y = self.heart_y - visual_height / 2
 
             # Создаем объект Rect для draw_texture_rect
             rect = Rect(x=x, y=y, width=visual_width, height=visual_height)
@@ -236,9 +326,21 @@ class GameView(arcade.View):
             # Рисуем текстуру
             arcade.draw_texture_rect(self.heart_texture, rect)
 
-            # Отладочная отрисовка hitbox (красный круг) - можно включить для тестирования
-            # arcade.draw_circle_outline(self.heart_x, self.heart_y, self.heart_size, arcade.color.RED, 2)
-            # arcade.draw_circle_filled(self.heart_x, self.heart_y, 3, arcade.color.BLUE)  # Центр
+            # Отладка: хитбокс (можно включить для тестирования)
+            # arcade.draw_circle_outline(self.heart_x, self.heart_y, self.heart_size, arcade.color.RED, 1)
+        else:
+            # Запасной вариант: красный круг с пульсацией
+            pulse_progress = (math.sin(self.heart_pulse) + 1) / 2
+            pulse_scale = self.heart_pulse_min + (self.heart_pulse_max - self.heart_pulse_min) * pulse_progress
+            radius = self.heart_size * 0.8 * pulse_scale
+            arcade.draw_circle_filled(self.heart_x, self.heart_y, radius, arcade.color.RED)
+            arcade.draw_circle_outline(self.heart_x, self.heart_y, radius, arcade.color.WHITE, 1)
+
+        # Частицы
+        for p in self.particles:
+            alpha = int(255 * (p["lifetime"] / p["max_lifetime"]))
+            color_with_alpha = (p["color"][0], p["color"][1], p["color"][2], alpha)
+            arcade.draw_circle_filled(p["x"], p["y"], p["size"], color_with_alpha)
 
         # Полоса HP под ареной
         hp_bar_y = self.arena_bottom - 40
@@ -318,6 +420,31 @@ class GameView(arcade.View):
         if not self.game_active or self.paused:
             return
 
+        # Пульсация сердца (менее заметная)
+        self.heart_pulse += delta_time * self.heart_pulse_speed
+
+        # Вращение декоративной звезды
+        self.decor_angle += delta_time * 45  # 45 градусов в секунду
+
+        # Обновление спрайта сердца (если он существует)
+        if self.heart_sprite:
+            self.heart_sprite.center_x = self.heart_x
+            self.heart_sprite.center_y = self.heart_y
+
+        # Обновление частиц
+        particles_to_remove = []
+        for i, p in enumerate(self.particles):
+            p["x"] += p["dx"]
+            p["y"] += p["dy"]
+            p["lifetime"] -= delta_time
+            p["dy"] -= 0.1  # гравитация
+
+            if p["lifetime"] <= 0:
+                particles_to_remove.append(i)
+
+        for i in sorted(particles_to_remove, reverse=True):
+            self.particles.pop(i)
+
         current_time = time.time()
 
         # Обновление таймера
@@ -333,20 +460,14 @@ class GameView(arcade.View):
                 self.end_game()
                 return
 
-        # Движение сердца с ПРАВИЛЬНЫМИ границами
-        # ИСПРАВЛЕНО: границы движения должны учитывать смещение текстуры
+        # Движение сердца с границами
         speed = self.heart_speed * delta_time
 
-        # Если текстура съезжает, нужно компенсировать это в границах движения
-        # Эмпирически подобраны смещения
-        horizontal_offset = self.heart_size * 0.3  # Компенсация для левой/правой границы
-        vertical_offset = self.heart_size * 0.5  # Компенсация для верхней/нижней границы
-
-        # Рассчитываем границы с учетом размера сердца и смещений
-        left_boundary = self.arena_left + self.heart_size + horizontal_offset + 4
-        right_boundary = self.arena_right - self.heart_size + horizontal_offset + 3.7
-        bottom_boundary = self.arena_bottom + self.heart_size + vertical_offset - 1.5
-        top_boundary = self.arena_top - self.heart_size + vertical_offset - 2.3
+        # Улучшенные границы (без сложных смещений)
+        left_boundary = self.arena_left + self.heart_size
+        right_boundary = self.arena_right - self.heart_size
+        bottom_boundary = self.arena_bottom + self.heart_size
+        top_boundary = self.arena_top - self.heart_size
 
         if arcade.key.LEFT in self.keys_pressed or arcade.key.A in self.keys_pressed:
             self.heart_x = max(left_boundary, self.heart_x - speed)
@@ -364,21 +485,46 @@ class GameView(arcade.View):
             self.bullet_timer = 0
             self.total_bullets += 1
 
-        # Проверка столкновений и нанесение урона
+        # УЛУЧШЕННАЯ ПРОВЕРКА СТОЛКНОВЕНИЙ
         collision_detected = False
+
+        # Метод 1: Расстояние между центрами (основной)
         for bullet in self.bullets:
-            # Проверка столкновения с сердцем (используем центр hitbox)
             distance = math.sqrt((bullet["x"] - self.heart_x) ** 2 + (bullet["y"] - self.heart_y) ** 2)
-            if distance < self.heart_size + self.bullet_radius:
+            # Учитываем пульсацию в хитбоксе
+            current_heart_radius = self.heart_size * self.heart_pulse_max
+            if distance < current_heart_radius + self.bullet_radius:
                 collision_detected = True
                 break
 
-        # Нанесение урона при столкновении (каждые 50 мс - УМЕНЬШИЛИ)
+        # Метод 2: Если есть спрайт сердца, проверяем коллизию с пулями-спрайтами
+        if self.heart_sprite and not collision_detected:
+            # Создаём временный спрайт для пули для проверки коллизии
+            for bullet in self.bullets:
+                try:
+                    bullet_sprite = arcade.SpriteCircle(self.bullet_radius, arcade.color.YELLOW)
+                    bullet_sprite.center_x = bullet["x"]
+                    bullet_sprite.center_y = bullet["y"]
+                    if arcade.check_for_collision(self.heart_sprite, bullet_sprite):
+                        collision_detected = True
+                        break
+                except:
+                    # Если не удалось создать спрайт, используем только метод 1
+                    pass
+
+        # Нанесение урона при столкновении
         if collision_detected:
             if current_time - self.last_damage_time >= self.damage_interval:
                 self.player_hp -= 1
                 self.last_damage_time = current_time
                 self.hp_text.text = f"HP: {self.player_hp}/{self.max_hp}"
+
+                # Звук попадания
+                if self.sound_enabled and self.hit_sound:
+                    arcade.play_sound(self.hit_sound, volume=0.5)
+
+                # Частицы при попадании
+                self.create_hit_particles(self.heart_x, self.heart_y)
 
                 # Проверка поражения
                 if self.player_hp <= 0:
@@ -404,6 +550,28 @@ class GameView(arcade.View):
         # Удаление отработанных пуль
         for i in sorted(bullets_to_remove, reverse=True):
             self.bullets.pop(i)
+
+    def create_hit_particles(self, x, y):
+        """Создать частицы крови при попадании"""
+        for _ in range(8):  # 8 частиц за раз
+            angle = random.uniform(0, 2 * math.pi)
+            speed = random.uniform(1, 4)
+            dx = math.cos(angle) * speed
+            dy = math.sin(angle) * speed
+            size = random.uniform(3, 8)
+            lifetime = random.uniform(0.5, 1.5)  # секунды
+            color = random.choice(self.particle_colors)
+
+            self.particles.append({
+                "x": x,
+                "y": y,
+                "dx": dx,
+                "dy": dy,
+                "size": size,
+                "lifetime": lifetime,
+                "max_lifetime": lifetime,
+                "color": color
+            })
 
     def create_bullet(self):
         """Создание новой пули"""
@@ -457,6 +625,10 @@ class GameView(arcade.View):
             "speed": random.uniform(180, 220)
         })
 
+        # Звук выстрела
+        if self.sound_enabled and self.shoot_sound:
+            arcade.play_sound(self.shoot_sound, volume=0.3)
+
     def end_game(self):
         """Завершение игры"""
         elapsed = time.time() - self.start_time if self.start_time else 0
@@ -470,12 +642,19 @@ class GameView(arcade.View):
             "hp_remaining": self.player_hp
         }
 
+        # Звук победы/поражения
+        if self.sound_enabled:
+            if self.victory and self.win_sound:
+                arcade.play_sound(self.win_sound)
+            elif not self.victory and self.lose_sound:
+                arcade.play_sound(self.lose_sound)
+
         arcade.schedule(self.show_results, 2.0)
 
     def show_results(self, delta_time):
         """Показать результаты игры"""
         arcade.unschedule(self.show_results)
-        from .result_view import ResultView
+        from data.result_view import ResultView
 
         stats = self.game_stats
         result_view = ResultView(
@@ -529,7 +708,7 @@ class GameView(arcade.View):
                 if self.pause_start_time:
                     pause_duration = time.time() - self.pause_start_time
                     self.start_time += pause_duration
-                from .main_menu_view import MainMenuView
+                from data.main_menu_view import MainMenuView
                 menu_view = MainMenuView()
                 menu_view.setup()
                 self.window.show_view(menu_view)

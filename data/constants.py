@@ -21,3 +21,5 @@ DOT_COLOR = arcade.color.RED
 DOT_OUTLINE_COLOR = arcade.color.DARK_RED
 PAUSE_OVERLAY_COLOR = (0, 0, 0, 180)
 SQUARE_COLOR = arcade.color.WHITE
+
+SOUND_VOLUME = 0.5
