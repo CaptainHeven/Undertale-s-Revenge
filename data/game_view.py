@@ -125,11 +125,11 @@ class GameView(arcade.View):
 
         # Загрузка звуков
         try:
-            self.shoot_sound = arcade.load_sound("sounds/shoot.wav")
-            self.hit_sound = arcade.load_sound("sounds/hit.wav")
-            self.win_sound = arcade.load_sound("sounds/win.wav")
-            self.lose_sound = arcade.load_sound("sounds/lose.wav")
-            self.background_music = arcade.load_sound("sounds/music.wav")
+            self.shoot_sound = arcade.load_sound("materials/shoot.wav")
+            self.hit_sound = arcade.load_sound("materials/hit.wav")
+            self.win_sound = arcade.load_sound("materials/win.wav")
+            self.lose_sound = arcade.load_sound("materials/lose.wav")
+            self.background_music = arcade.load_sound("materials/music.wav")
         except Exception as e:
             print(f"Ошибка при загрузке звуков: {e}")
             print("Звуки не найдены. Создайте папку sounds/ с файлами:")
