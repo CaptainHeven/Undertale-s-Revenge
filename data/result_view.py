@@ -1,7 +1,7 @@
 import arcade
 from pyglet.graphics import Batch
-from .beautiful_button import BeautifulButton
-from .constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, BACKGROUND_COLOR
+from data.beautiful_button import BeautifulButton
+from data.constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, BACKGROUND_COLOR
 
 
 class ResultView(arcade.View):
@@ -23,6 +23,18 @@ class ResultView(arcade.View):
 
     def setup(self):
         self.batch = Batch()
+
+        # ⚡ Загружаем настройки звуков
+        if hasattr(self.window, 'sounds_enabled'):
+            self.sound_enabled = self.window.sounds_enabled
+        else:
+            self.sound_enabled = True
+
+        # Загружаем звук кнопки (можно добавить)
+        try:
+            self.click_sound = arcade.load_sound("materials/click.wav")
+        except:
+            self.click_sound = None
 
         # Кнопка возврата в меню
         self.menu_button = BeautifulButton(
@@ -106,9 +118,19 @@ class ResultView(arcade.View):
     def on_draw(self):
         self.clear()
         arcade.draw_lrbt_rectangle_filled(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, BACKGROUND_COLOR)
+
         self.menu_button.draw()
         self.restart_button.draw()
         self.batch.draw()
+
+        darkness = getattr(self.window, 'darkness_factor', 0)
+        if darkness > 0:
+            alpha = int(255 * darkness)
+            arcade.draw_lrbt_rectangle_filled(
+                0, SCREEN_WIDTH,
+                0, SCREEN_HEIGHT,
+                (0, 0, 0, alpha)
+            )
 
     def on_mouse_motion(self, x, y, dx, dy):
         if self.menu_button:
@@ -116,15 +138,20 @@ class ResultView(arcade.View):
         if self.restart_button:
             self.restart_button.check_hover(x, y)
 
+        if self.menu_button.check_click(x, y):
+            if self.sound_enabled and self.click_sound:
+                arcade.play_sound(self.click_sound)
+            from data.main_menu_view import MainMenuView
+
     def on_mouse_press(self, x, y, button, modifiers):
         if button == arcade.MOUSE_BUTTON_LEFT:
             if self.menu_button and self.menu_button.check_click(x, y):
-                from .main_menu_view import MainMenuView
+                from data.main_menu_view import MainMenuView
                 menu_view = MainMenuView()
                 menu_view.setup()
                 self.window.show_view(menu_view)
             elif self.restart_button and self.restart_button.check_click(x, y):
-                from .game_view import GameView
+                from data.game_view import GameView
                 game_view = GameView()
                 game_view.setup()
                 self.window.show_view(game_view)
