@@ -1,21 +1,19 @@
 import arcade
 import random
 from pyglet.graphics import Batch
-from arcade.particles import FadeParticle, Emitter, EmitBurst, EmitInterval, EmitMaintainCount
+from arcade.particles import FadeParticle, Emitter, EmitInterval
 from data.beautiful_button import BeautifulButton
 from data.constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_SPACING, BACKGROUND_COLOR
 
-# ========== ТЕКСТУРЫ ДЛЯ ЧАСТИЦ ==========
 PARTICLE_TEXTURES = [
-    arcade.make_circle_texture(4, (255, 200, 100, 255)),  # жёлтый
-    arcade.make_circle_texture(5, (255, 150, 50, 255)),   # оранжевый
-    arcade.make_circle_texture(3, (255, 100, 50, 255)),   # красно-оранжевый
-    arcade.make_circle_texture(4, (255, 220, 150, 255)),  # светло-жёлтый
+    arcade.make_circle_texture(4, (255, 200, 100, 255)),
+    arcade.make_circle_texture(5, (255, 150, 50, 255)),
+    arcade.make_circle_texture(3, (255, 100, 50, 255)),
+    arcade.make_circle_texture(4, (255, 220, 150, 255)),
 ]
 
 
 def particle_factory(center_x, center_y):
-    """Создаёт одну частицу"""
     texture = random.choice(PARTICLE_TEXTURES)
     particle = FadeParticle(
         filename_or_texture=texture,
@@ -35,23 +33,21 @@ class MainMenuView(arcade.View):
         self.batch = None
         self.title_text = None
         self.emitter = None
+        self.background_music = None
+        self.sound_enabled = True
 
     def setup(self):
         self.batch = Batch()
-
         button_y = SCREEN_HEIGHT // 2 + BUTTON_HEIGHT
 
         # ===== МУЗЫКА =====
-        if hasattr(self.window, 'background_music') and self.window.background_music:
+        # Получаем музыку из window (она всегда играет)
+        if hasattr(self.window, 'background_music'):
             self.background_music = self.window.background_music
-            if hasattr(self.window, 'music_enabled'):
-                self.sound_enabled = self.window.music_enabled
-            if hasattr(self.window, 'music_volume'):
-                self.background_music.volume = self.window.music_volume
-            if self.sound_enabled:
-                self.background_music.play(volume=self.background_music.volume, loop=True)
-            else:
-                self.background_music.pause()
+
+        # Загружаем настройки для звуков эффектов
+        if hasattr(self.window, 'sounds_enabled'):
+            self.sound_enabled = self.window.sounds_enabled
 
         # ===== КНОПКИ =====
         self.play_button = BeautifulButton(
@@ -97,25 +93,29 @@ class MainMenuView(arcade.View):
             bold=True,
             batch=self.batch
         )
-        
+
+        # ===== ЭМИТТЕР ФОНОВЫХ ЧАСТИЦ =====
         self.setup_emitter()
 
     def setup_emitter(self):
-        """Создаёт эмиттер, который постоянно генерирует частицы по всему экрану"""
-
         def emit_position(emitter):
-            """Генерирует частицы в случайных позициях экрана"""
             return random.randint(0, SCREEN_WIDTH), random.randint(0, SCREEN_HEIGHT)
 
         self.emitter = Emitter(
-            center_xy=(0, 0),  # не используется, т.к. есть emit_position
-            emit_controller=EmitInterval(0.02),  # частица каждые 0.05 сек
+            center_xy=(0, 0),
+            emit_controller=EmitInterval(0.02),
             particle_factory=lambda e: particle_factory(*emit_position(e))
         )
+
+    def apply_sound_settings(self):
+        """Применить настройки звука из window"""
+        if hasattr(self.window, 'sounds_enabled'):
+            self.sound_enabled = self.window.sounds_enabled
 
     def on_draw(self):
         self.clear()
         arcade.draw_lrbt_rectangle_filled(0, SCREEN_WIDTH, 0, SCREEN_HEIGHT, BACKGROUND_COLOR)
+
         if self.emitter:
             self.emitter.draw()
 
@@ -123,8 +123,20 @@ class MainMenuView(arcade.View):
             button.draw()
         self.batch.draw()
 
+        darkness = getattr(self.window, 'darkness_factor', 0)
+        if darkness > 0:
+            alpha = int(255 * darkness)
+            arcade.draw_lrbt_rectangle_filled(
+                0, SCREEN_WIDTH,
+                0, SCREEN_HEIGHT,
+                (0, 0, 0, alpha)
+            )
+
     def on_update(self, delta_time):
-        # Обновляем эмиттер
+        if hasattr(self.window, 'sounds_enabled'):
+            if self.sound_enabled != self.window.sounds_enabled:
+                self.apply_sound_settings()
+
         if self.emitter:
             self.emitter.update(delta_time)
 
