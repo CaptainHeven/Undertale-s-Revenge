@@ -5,6 +5,7 @@ from arcade.particles import FadeParticle, Emitter, EmitInterval
 from data.beautiful_button import BeautifulButton
 from data.constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_SPACING, BACKGROUND_COLOR
 
+
 PARTICLE_TEXTURES = [
     arcade.make_circle_texture(4, (255, 200, 100, 255)),
     arcade.make_circle_texture(5, (255, 150, 50, 255)),
