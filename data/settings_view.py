@@ -5,6 +5,7 @@ from pyglet.graphics import Batch
 from data.beautiful_button import BeautifulButton
 from data.constants import SCREEN_WIDTH, SCREEN_HEIGHT, BUTTON_WIDTH, BUTTON_HEIGHT, BACKGROUND_COLOR
 
+
 SETTINGS_FILE = "settings.csv"
 
 
