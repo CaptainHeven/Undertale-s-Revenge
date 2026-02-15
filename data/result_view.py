@@ -74,7 +74,7 @@ class ResultView(arcade.View):
         )
 
         # Время выживания
-        time_msg = f"Время: {self.elapsed_time:.1f} сек" if not self.victory else "Вы продержались 30 секунд!"
+        time_msg = f"Время: {self.elapsed_time:.1f} сек" if not self.victory else "Вы измотали это крутящееся чудо!"
         self.time_text = arcade.Text(
             time_msg,
             SCREEN_WIDTH // 2,
