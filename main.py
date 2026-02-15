@@ -25,7 +25,7 @@ class GameWindow(arcade.Window):
 
         # Загружаем музыку всегда (если файл есть)
         try:
-            self.background_music = arcade.load_sound("materials/music.wav")
+            self.background_music = arcade.load_sound("materials/sounds/btt.mp3")
             if self.background_music:
                 self.music_loaded = True
                 # Всегда играем с громкостью 0.3

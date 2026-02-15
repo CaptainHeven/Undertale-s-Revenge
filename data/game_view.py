@@ -45,8 +45,8 @@ class GameView(arcade.View):
         self.pause_start_time = None
         self.victory = False
 
-        self.player_hp = 80
-        self.max_hp = 80
+        self.player_hp = 92
+        self.max_hp = 92
         self.last_damage_time = 0
         self.damage_interval = 0.1
 
@@ -210,12 +210,10 @@ class GameView(arcade.View):
             self.heart_texture2 = None
 
         try:
-            self.shoot_sound = arcade.load_sound("materials/shoot.wav")
-            self.hit_sound = arcade.load_sound("materials/hit.wav")
-            self.win_sound = arcade.load_sound("materials/win.wav")
-            self.lose_sound = arcade.load_sound("materials/lose.wav")
-            self.background_music = arcade.load_sound("materials/music.wav")
-            self.background_music.play(volume=0.3, loop=True)
+            self.shoot_sound = arcade.load_sound("materials/sounds/shoot.wav")
+            self.hit_sound = arcade.load_sound("materials/sounds/hit.wav")
+            self.win_sound = arcade.load_sound("materials/sounds/win.wav")
+            self.lose_sound = arcade.load_sound("materials/sounds/lose.wav")
         except Exception as e:
             print(f"Ошибка при загрузке звуков: {e}")
             self.sound_enabled = False
