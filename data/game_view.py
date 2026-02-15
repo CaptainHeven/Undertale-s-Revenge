@@ -12,6 +12,7 @@ from data.constants import (
     PAUSE_OVERLAY_COLOR
 )
 
+
 # Определяем тип Rect для draw_texture_rect
 Rect = namedtuple('Rect', ['x', 'y', 'width', 'height'])
 
