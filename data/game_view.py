@@ -184,7 +184,7 @@ class GameView(arcade.View):
     def setup(self):
         try:
             possible_paths = [
-                "materials/heart.png",
+                "materials/images/heart.png",
                 "../materials/heart.png",
                 os.path.join(os.path.dirname(__file__), "../materials/heart.png")
             ]
@@ -203,7 +203,7 @@ class GameView(arcade.View):
             self.heart_texture = None
 
         try:
-            self.heart_texture2 = arcade.load_texture("materials/heartN2.png")
+            self.heart_texture2 = arcade.load_texture("materials/images/heartN2.png")
             print("Текстура сердца heartN2 загружена")
         except:
             print("Файл heartN2.png не найден")
