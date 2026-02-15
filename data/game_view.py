@@ -211,7 +211,7 @@ class GameView(arcade.View):
 
         try:
             self.shoot_sound = arcade.load_sound("materials/sounds/shoot.wav")
-            self.hit_sound = arcade.load_sound("materials/sounds/hit.wav")
+            self.hit_sound = arcade.load_sound("materials/sounds/hit.mp3")
             self.win_sound = arcade.load_sound("materials/sounds/win.wav")
             self.lose_sound = arcade.load_sound("materials/sounds/lose.wav")
         except Exception as e:
